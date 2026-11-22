@@ -152,6 +152,9 @@ jobs:
               echo "VK_DRIVER_FILES=${icds[0]}"
               echo "VK_ICD_FILENAMES=${icds[0]}"
             } >> "$GITHUB_ENV"
+          else
+            echo "::error::Lavapipe ICD manifest not found under /usr/share/vulkan/icd.d/lvp_icd*.json"
+            exit 1
           fi
           echo "WGPU_BACKEND=vulkan" >> "$GITHUB_ENV"
 
