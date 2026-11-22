@@ -212,22 +212,25 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$WATERUI_TEST_ARTIFACTS_DIR"
+          shlex_split() {
+            python3 -c 'import shlex, sys; [sys.stdout.buffer.write(a.encode() + b"\0") for a in shlex.split(sys.argv[1])]' "$1"
+          }
           cmd=(cargo nextest run --locked)
-          if [ -f .config/nextest.toml ]; then
+          if [ -f .config/nextest.toml ] && grep -q '^\[profile\.ci\]' .config/nextest.toml; then
             cmd+=(--profile ci)
           fi
           if [ -n "$PACKAGES" ]; then
-            read -ra pkg_args <<< "$PACKAGES"
+            mapfile -d '' -t pkg_args < <(shlex_split "$PACKAGES")
             cmd+=("${pkg_args[@]}")
           else
             cmd+=(--workspace)
           fi
           if [ -n "$GPU_FEATURES" ]; then
-            read -ra feat_args <<< "$GPU_FEATURES"
+            mapfile -d '' -t feat_args < <(shlex_split "$GPU_FEATURES")
             cmd+=("${feat_args[@]}")
           fi
           if [ -n "$NEXTEST_ARGS" ]; then
-            read -ra extra_args <<< "$NEXTEST_ARGS"
+            mapfile -d '' -t extra_args < <(shlex_split "$NEXTEST_ARGS")
             cmd+=("${extra_args[@]}")
           fi
           "${cmd[@]}"
@@ -246,20 +249,23 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$WATERUI_TEST_ARTIFACTS_DIR"
+          shlex_split() {
+            python3 -c 'import shlex, sys; [sys.stdout.buffer.write(a.encode() + b"\0") for a in shlex.split(sys.argv[1])]' "$1"
+          }
           cmd=(cargo nextest run --locked)
-          if [ -f .config/nextest.toml ]; then
+          if [ -f .config/nextest.toml ] && grep -q '^\[profile\.ci\]' .config/nextest.toml; then
             cmd+=(--profile ci)
           fi
           if [ -n "$PACKAGES" ]; then
-            read -ra pkg_args <<< "$PACKAGES"
+            mapfile -d '' -t pkg_args < <(shlex_split "$PACKAGES")
             cmd+=("${pkg_args[@]}")
           else
             cmd+=(--workspace)
           fi
-          read -ra feat_args <<< "$CPU_FEATURES"
+          mapfile -d '' -t feat_args < <(shlex_split "$CPU_FEATURES")
           cmd+=("${feat_args[@]}")
           if [ -n "$NEXTEST_ARGS" ]; then
-            read -ra extra_args <<< "$NEXTEST_ARGS"
+            mapfile -d '' -t extra_args < <(shlex_split "$NEXTEST_ARGS")
             cmd+=("${extra_args[@]}")
           fi
           "${cmd[@]}"
