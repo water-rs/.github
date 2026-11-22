@@ -145,16 +145,18 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y "${pkgs[@]}"
           fi
-          icd="/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
-          if [ ! -f "$icd" ]; then
-            icd="$(ls /usr/share/vulkan/icd.d/lvp_icd.*.json | head -n 1)"
+          shopt -s nullglob
+          icds=(/usr/share/vulkan/icd.d/lvp_icd*.json)
+          if [ "${#icds[@]}" -gt 0 ]; then
+            {
+              echo "VK_DRIVER_FILES=${icds[0]}"
+              echo "VK_ICD_FILENAMES=${icds[0]}"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::error::Lavapipe ICD manifest not found under /usr/share/vulkan/icd.d/lvp_icd*.json"
+            exit 1
           fi
-          test -f "$icd"
-          {
-            echo "VK_DRIVER_FILES=$icd"
-            echo "VK_ICD_FILENAMES=$icd"
-            echo "WGPU_BACKEND=vulkan"
-          } >> "$GITHUB_ENV"
+          echo "WGPU_BACKEND=vulkan" >> "$GITHUB_ENV"
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -272,7 +274,7 @@ jobs:
 
       - name: Evaluate FLIP diffs, magma heatmaps, and generate HTML gallery
         id: evaluate
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.gpu-pass.outcome != 'skipped' }}
         continue-on-error: true
         working-directory: ${{ inputs.working-directory }}
         shell: bash
