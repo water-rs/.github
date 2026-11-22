@@ -199,6 +199,43 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: uv run "${{ steps.test-fonts.outputs.script }}"
 
+      - name: Check for STIX Two Math font requirement
+        id: stix-font
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo metadata --format-version 1 --locked | jq -e '[.packages[].metadata.waterui.assets.font[]? | .name == "STIX Two Math"] | any' >/dev/null; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore cached STIX Two Math font
+        if: steps.stix-font.outputs.needed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/fonts/STIXTwoMath-Regular.otf
+          key: stix-two-math-v1-${{ runner.os }}-3a5f3f26
+
+      - name: Install STIX Two Math font
+        if: steps.stix-font.outputs.needed == 'true'
+        shell: bash
+        env:
+          STIX_URL: https://github.com/stipub/stixfonts/raw/744a22a4dd626cd14d75728aef34fc8ad7c85db0/fonts/static_otf/STIXTwoMath-Regular.otf
+          STIX_SHA256: 3a5f3f26f40d5698b3c62dd085d48d6663696a3f80825aab8b553d5097518e8c
+        run: |
+          set -euo pipefail
+          font_dir="$HOME/.local/share/fonts"
+          font_path="$font_dir/STIXTwoMath-Regular.otf"
+          mkdir -p "$font_dir"
+          if [ ! -f "$font_path" ] || ! echo "$STIX_SHA256  $font_path" | sha256sum -c - >/dev/null 2>&1; then
+            curl -fsSL "$STIX_URL" -o "$font_path"
+            echo "$STIX_SHA256  $font_path" | sha256sum -c -
+          fi
+          fc-cache -f
+          fc-list | grep -i 'STIX Two Math'
+
       - uses: taiki-e/install-action@nextest
 
       - name: Render visual suite on Lavapipe (Vulkan GPU)
