@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WaterUI Visual Conformance &amp; Showcase Gallery</title>
+  <style>
+    :root {
+      color-scheme: dark light;
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-alt: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --pass: #2ea043;
+      --pass-bg: rgba(46, 160, 67, 0.15);
+      --fail: #f85149;
+      --fail-bg: rgba(248, 81, 73, 0.15);
+      --warn: #d29922;
+      --warn-bg: rgba(210, 153, 34, 0.15);
+      --checker-a: #1a2028;
+      --checker-b: #12171d;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fa;
+        --surface: #ffffff;
+        --surface-alt: #f0f3f6;
+        --border: #d0d7de;
+        --text: #1f2328;
+        --muted: #656d76;
+        --accent: #0969da;
+        --pass: #1a7f37;
+        --pass-bg: rgba(26, 127, 55, 0.12);
+        --fail: #cf222e;
+        --fail-bg: rgba(207, 34, 46, 0.12);
+        --warn: #9a6700;
+        --warn-bg: rgba(154, 103, 0, 0.12);
+        --checker-a: #e8ecf0;
+        --checker-b: #f6f8fa;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 1.75rem;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .header-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.18rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .badge-pass { background: var(--pass-bg); color: var(--pass); border: 1px solid var(--pass); }
+    .badge-fail { background: var(--fail-bg); color: var(--fail); border: 1px solid var(--fail); }
+    .badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+    .summary-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .stat-pill {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.25rem 0.65rem;
+    }
+    .stat-pill strong { color: var(--text); }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 0.9rem;
+      align-items: center;
+    }
+    input[type="search"], select {
+      background: var(--surface-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.7rem;
+      font-size: 0.85rem;
+    }
+    input[type="search"] { min-width: 240px; flex: 1; max-width: 400px; }
+    .mode-group {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .mode-btn {
+      background: var(--surface-alt);
+      color: var(--muted);
+      border: none;
+      border-right: 1px solid var(--border);
+      padding: 0.4rem 0.75rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .mode-btn:last-child { border-right: none; }
+    .mode-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    main {
+      padding: 1.5rem 1.75rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 0.85rem 1.15rem;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .card-title {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .card-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.78rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .metric-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.15rem 0.5rem;
+    }
+    .panels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      padding: 1.15rem;
+    }
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .panel-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      justify-content: space-between;
+    }
+    .frame-box {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image:
+        linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-color: var(--checker-b);
+      min-height: 140px;
+    }
+    .frame-box img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      image-rendering: pixelated;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+    }
+    .reasons {
+      padding: 0.6rem 1.15rem;
+      background: var(--fail-bg);
+      color: var(--fail);
+      font-size: 0.82rem;
+      border-bottom: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <h1>
+        <span id="repo-title">WaterUI Visual Gallery</span>
+        <span id="overall-badge" class="badge"></span>
+      </h1>
+      <div id="summary-stats" class="summary-stats"></div>
+    </div>
+    <div class="controls">
+      <input type="search" id="search-input" placeholder="Filter by suite, case, or stage...">
+      <select id="status-filter">
+        <option value="all">All Stages</option>
+        <option value="failed">Failed Only</option>
+        <option value="passed">Passed Only</option>
+        <option value="blank">Blank / Missing</option>
+      </select>
+      <select id="sort-select">
+        <option value="flip_desc">Sort: Worst FLIP Mean</option>
+        <option value="p95_desc">Sort: Worst FLIP P95</option>
+        <option value="max_desc">Sort: Worst FLIP Max</option>
+        <option value="name_asc">Sort: Suite / Case / Stage</option>
+      </select>
+      <div class="mode-group" id="mode-group">
+        <button type="button" class="mode-btn active" data-mode="side-by-side">Side-by-Side</button>
+        <button type="button" class="mode-btn" data-mode="gpu">GPU (Lavapipe)</button>
+        <button type="button" class="mode-btn" data-mode="cpu">CPU</button>
+        <button type="button" class="mode-btn" data-mode="baseline">Baseline</button>
+        <button type="button" class="mode-btn" data-mode="heatmap">FLIP Heatmap</button>
+      </div>
+    </div>
+  </header>
+  <main id="gallery-root"></main>
+  <script id="gallery-report-data" type="application/json">/*__GALLERY_REPORT_JSON__*/</script>
+  <script>
+    (() => {
+      const raw = document.getElementById("gallery-report-data").textContent.trim();
+      const report = JSON.parse(raw);
+      const repoTitle = document.getElementById("repo-title");
+      const overallBadge = document.getElementById("overall-badge");
+      const summaryStats = document.getElementById("summary-stats");
+      const galleryRoot = document.getElementById("gallery-root");
+      const searchInput = document.getElementById("search-input");
+      const statusFilter = document.getElementById("status-filter");
+      const sortSelect = document.getElementById("sort-select");
+      const modeButtons = Array.from(document.querySelectorAll("#mode-group .mode-btn"));
+
+      let activeMode = "side-by-side";
+
+      repoTitle.textContent = report.repository
+        ? `${report.repository} — Visual Gallery`
+        : "WaterUI Visual Gallery";
+
+      if (report.passed) {
+        overallBadge.textContent = "PASS";
+        overallBadge.className = "badge badge-pass";
+      } else {
+        overallBadge.textContent = "FAIL";
+        overallBadge.className = "badge badge-fail";
+      }
+
+      const statItems = [
+        ["Suites", report.summary.suites],
+        ["Cases", report.summary.cases],
+        ["Stages", report.summary.stages],
+        ["Passed", report.summary.passed],
+        ["Failed", report.summary.failed],
+        ["Blank", report.summary.blank],
+        ["Missing", report.summary.missing],
+        ["FLIP Gates", `mean ≤ ${report.thresholds.flip_mean_max}, p95 ≤ ${report.thresholds.flip_p95_max}`],
+      ];
+      summaryStats.replaceChildren(
+        ...statItems.map(([label, value]) => {
+          const pill = document.createElement("span");
+          pill.className = "stat-pill";
+          const strong = document.createElement("strong");
+          strong.textContent = `${value}`;
+          pill.append(`${label}: `, strong);
+          return pill;
+        })
+      );
+
+      function worstScore(entry, field) {
+        let best = -1;
+        for (const cmp of [entry.cpu_comparison, entry.baseline_comparison]) {
+          if (cmp && typeof cmp[field] === "number" && cmp[field] > best) {
+            best = cmp[field];
+          }
+        }
+        return best;
+      }
+
+      function formatNum(value) {
+        return typeof value === "number" ? value.toFixed(4) : "—";
+      }
+
+      function buildPanel(label, sublabel, src) {
+        const panel = document.createElement("div");
+        panel.className = "panel";
+        const header = document.createElement("div");
+        header.className = "panel-label";
+        const titleSpan = document.createElement("span");
+        titleSpan.textContent = label;
+        const subSpan = document.createElement("span");
+        subSpan.textContent = sublabel || "";
+        header.append(titleSpan, subSpan);
+
+        const box = document.createElement("div");
+        box.className = "frame-box";
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.src = src;
+        img.alt = `${label} (${sublabel || ""})`;
+        box.appendChild(img);
+        panel.append(header, box);
+        return panel;
+      }
+
+      function render() {
+        const query = searchInput.value.trim().toLowerCase();
+        const status = statusFilter.value;
+        const sortBy = sortSelect.value;
+
+        const filtered = report.stages.filter((item) => {
+          const key = `${item.suite}/${item.case}/${item.stage}`.toLowerCase();
+          if (query && !key.includes(query)) return false;
+          if (status === "failed" && item.passed) return false;
+          if (status === "passed" && !item.passed) return false;
+          if (status === "blank" && item.gpu_non_blank !== false && item.cpu_non_blank !== false && !item.missing) return false;
+          return true;
+        });
+
+        filtered.sort((a, b) => {
+          if (sortBy === "flip_desc") {
+            return worstScore(b, "flip_mean") - worstScore(a, "flip_mean");
+          }
+          if (sortBy === "p95_desc") {
+            return worstScore(b, "flip_p95") - worstScore(a, "flip_p95");
+          }
+          if (sortBy === "max_desc") {
+            return worstScore(b, "flip_max") - worstScore(a, "flip_max");
+          }
+          return `${a.suite}/${a.case}/${a.stage}`.localeCompare(`${b.suite}/${b.case}/${b.stage}`);
+        });
+
+        if (filtered.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No stages match the active filter.";
+          galleryRoot.replaceChildren(empty);
+          return;
+        }
+
+        const cards = filtered.map((item) => {
+          const card = document.createElement("section");
+          card.className = "card";
+
+          const header = document.createElement("div");
+          header.className = "card-header";
+          const title = document.createElement("div");
+          title.className = "card-title";
+          title.textContent = `${item.suite} / ${item.case} / ${item.stage}`;
+
+          const metrics = document.createElement("div");
+          metrics.className = "card-metrics";
+          if (item.width && item.height) {
+            const dim = document.createElement("span");
+            dim.className = "metric-chip";
+            dim.textContent = `${item.width}×${item.height}`;
+            metrics.appendChild(dim);
+          }
+
+          for (const [label, cmp] of [["GPU↔CPU", item.cpu_comparison], ["GPU↔Base", item.baseline_comparison]]) {
+            if (cmp) {
+              const chip = document.createElement("span");
+              chip.className = "metric-chip";
+              chip.textContent = `${label} mean=${formatNum(cmp.flip_mean)} p95=${formatNum(cmp.flip_p95)} max=${formatNum(cmp.flip_max)} local=${formatNum(cmp.max_local_error)}`;
+              metrics.appendChild(chip);
+            }
+          }
+
+          const badge = document.createElement("span");
+          badge.className = `badge ${item.passed ? "badge-pass" : "badge-fail"}`;
+          badge.textContent = item.passed ? "PASS" : "FAIL";
+          metrics.appendChild(badge);
+
+          header.append(title, metrics);
+          card.appendChild(header);
+
+          if (item.failures && item.failures.length > 0) {
+            const reasons = document.createElement("div");
+            reasons.className = "reasons";
+            reasons.textContent = item.failures.join(" • ");
+            card.appendChild(reasons);
+          }
+
+          const panels = document.createElement("div");
+          panels.className = "panels";
+
+          const showGpu = activeMode === "side-by-side" || activeMode === "gpu";
+          const showCpu = activeMode === "side-by-side" || activeMode === "cpu";
+          const showBase = activeMode === "side-by-side" || activeMode === "baseline";
+          const showHeat = activeMode === "side-by-side" || activeMode === "heatmap";
+
+          if (showGpu && item.gpu_path) {
+            panels.appendChild(buildPanel("GPU (Lavapipe Vulkan)", item.gpu_non_blank ? "non-blank" : "BLANK", item.gpu_path));
+          }
+          if (showCpu && item.cpu_path) {
+            panels.appendChild(buildPanel("CPU (Cherenkov)", item.cpu_non_blank ? "non-blank" : "BLANK", item.cpu_path));
+          }
+          if (showBase && item.baseline_path) {
+            panels.appendChild(buildPanel("Baseline Reference", "", item.baseline_path));
+          }
+          if (showHeat && item.cpu_comparison && item.cpu_comparison.heatmap_path) {
+            panels.appendChild(buildPanel("FLIP Magma Heatmap (GPU vs CPU)", `mean ${formatNum(item.cpu_comparison.flip_mean)}`, item.cpu_comparison.heatmap_path));
+          }
+          if (showHeat && item.baseline_comparison && item.baseline_comparison.heatmap_path) {
+            panels.appendChild(buildPanel("FLIP Magma Heatmap (GPU vs Baseline)", `mean ${formatNum(item.baseline_comparison.flip_mean)}`, item.baseline_comparison.heatmap_path));
+          }
+
+          card.appendChild(panels);
+          return card;
+        });
+
+        galleryRoot.replaceChildren(...cards);
+      }
+
+      searchInput.addEventListener("input", render);
+      statusFilter.addEventListener("change", render);
+      sortSelect.addEventListener("change", render);
+      for (const btn of modeButtons) {
+        btn.addEventListener("click", () => {
+          for (const b of modeButtons) b.classList.remove("active");
+          btn.classList.add("active");
+          activeMode = btn.dataset.mode;
+          render();
+        });
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>
