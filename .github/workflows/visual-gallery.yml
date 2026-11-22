@@ -1,0 +1,341 @@
+name: Visual Gallery
+
+on:
+  workflow_call:
+    inputs:
+      packages:
+        description: Cargo package flags (e.g. "-p hydrolysis-m3"; empty defaults to "--workspace")
+        required: false
+        type: string
+        default: ""
+      nextest-args:
+        description: Extra cargo nextest run arguments or filtersets
+        required: false
+        type: string
+        default: ""
+      gpu-features:
+        description: Cargo feature flags for the Lavapipe Vulkan render pass
+        required: false
+        type: string
+        default: ""
+      cpu-features:
+        description: Cargo feature flags for the optional Cherenkov CPU render pass
+        required: false
+        type: string
+        default: ""
+      baseline-dir:
+        description: Optional repo-relative path to committed baseline PNGs (<suite>/<case>/<stage>.png)
+        required: false
+        type: string
+        default: ""
+      require-baseline:
+        description: Fail when a captured stage has no matching baseline PNG in baseline-dir
+        required: false
+        type: boolean
+        default: false
+      allow-empty:
+        description: Succeed even when zero snapshot PNGs are captured
+        required: false
+        type: boolean
+        default: false
+      flip-mean-max:
+        description: Maximum allowed FLIP mean error (0.0..=1.0)
+        required: false
+        type: string
+        default: "0.02"
+      flip-p95-max:
+        description: Maximum allowed FLIP 95th-percentile error (0.0..=1.0)
+        required: false
+        type: string
+        default: "0.05"
+      artifact-name:
+        description: Uploaded gallery artifact name
+        required: false
+        type: string
+        default: "visual-gallery"
+      retention-days:
+        description: Artifact retention days
+        required: false
+        type: number
+        default: 14
+      working-directory:
+        description: Working directory inside the caller repository
+        required: false
+        type: string
+        default: "."
+      ref:
+        description: Caller commit or ref to check out (defaults to caller HEAD)
+        required: false
+        type: string
+        default: ""
+      tooling-ref:
+        description: water-rs/.github ref for the gallery evaluator script
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: "10"
+  RUSTUP_MAX_RETRIES: "10"
+
+jobs:
+  gallery:
+    name: Visual Gallery (Lavapipe + CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Stage visual gallery tooling
+        uses: actions/checkout@v4
+        with:
+          repository: water-rs/.github
+          ref: ${{ inputs.tooling-ref || (github.repository == 'water-rs/.github' && github.sha || 'main') }}
+          path: .water-rs-visual-gallery-tools
+
+      - name: Move visual gallery tooling to runner temp
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${RUNNER_TEMP}/water-rs-visual-gallery-tools"
+          mv .water-rs-visual-gallery-tools/.github/scripts "${RUNNER_TEMP}/water-rs-visual-gallery-tools"
+          rm -rf .water-rs-visual-gallery-tools
+
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache apt archives
+        id: apt-cache
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: visual-gallery-apt-v1-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install Linux Lavapipe Vulkan and native dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkgs=(
+            libfontconfig1-dev
+            libva-dev
+            libpipewire-0.3-dev
+            libegl-dev
+            libgbm-dev
+            libwayland-dev
+            libxkbcommon-dev
+            libvulkan-dev
+            mesa-vulkan-drivers
+            libvulkan1
+            spirv-tools
+            fonts-noto-core
+            fonts-noto-cjk
+          )
+          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ] || \
+             ! sudo apt-get install -y --no-download "${pkgs[@]}"; then
+            sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+            sudo apt-get update
+            sudo apt-get install -y "${pkgs[@]}"
+          fi
+          icd="/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
+          if [ ! -f "$icd" ]; then
+            icd="$(ls /usr/share/vulkan/icd.d/lvp_icd.*.json | head -n 1)"
+          fi
+          test -f "$icd"
+          {
+            echo "VK_DRIVER_FILES=$icd"
+            echo "VK_ICD_FILENAMES=$icd"
+            echo "WGPU_BACKEND=vulkan"
+          } >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ inputs.working-directory }}
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Locate the Hydrolysis test-font script
+        id: test-fonts
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="$(cargo metadata --format-version 1 --locked | jq -r '.packages[] | select(.name == "hydrolysis") | .manifest_path | sub("Cargo.toml$"; "test-fonts/install.py")' | head -n 1)"
+          if [ -n "$script" ] && [ -f "$script" ]; then
+            {
+              echo "found=true"
+              echo "script=$script"
+              echo "dir=$(dirname "$script")"
+              echo "hash=$(uv run --no-project python -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$script")"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore cached Hydrolysis test fonts
+        if: steps.test-fonts.outputs.found == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.test-fonts.outputs.dir }}/*.ttf
+            ${{ steps.test-fonts.outputs.dir }}/*.otf
+          key: test-fonts-v1-${{ runner.os }}-${{ steps.test-fonts.outputs.hash }}
+
+      - name: Install Hydrolysis test fonts
+        if: steps.test-fonts.outputs.found == 'true'
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run "${{ steps.test-fonts.outputs.script }}"
+
+      - uses: taiki-e/install-action@nextest
+
+      - name: Render visual suite on Lavapipe (Vulkan GPU)
+        id: gpu-pass
+        continue-on-error: true
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        env:
+          WATERUI_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/visual-gallery/gpu
+          PACKAGES: ${{ inputs.packages }}
+          GPU_FEATURES: ${{ inputs.gpu-features }}
+          NEXTEST_ARGS: ${{ inputs.nextest-args }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$WATERUI_TEST_ARTIFACTS_DIR"
+          shlex_split() {
+            python3 -c 'import shlex, sys; [sys.stdout.buffer.write(a.encode() + b"\0") for a in shlex.split(sys.argv[1])]' "$1"
+          }
+          cmd=(cargo nextest run --locked)
+          if [ -f .config/nextest.toml ] && grep -q '^\[profile\.ci\]' .config/nextest.toml; then
+            cmd+=(--profile ci)
+          fi
+          if [ -n "$PACKAGES" ]; then
+            mapfile -d '' -t pkg_args < <(shlex_split "$PACKAGES")
+            cmd+=("${pkg_args[@]}")
+          else
+            cmd+=(--workspace)
+          fi
+          if [ -n "$GPU_FEATURES" ]; then
+            mapfile -d '' -t feat_args < <(shlex_split "$GPU_FEATURES")
+            cmd+=("${feat_args[@]}")
+          fi
+          if [ -n "$NEXTEST_ARGS" ]; then
+            mapfile -d '' -t extra_args < <(shlex_split "$NEXTEST_ARGS")
+            cmd+=("${extra_args[@]}")
+          fi
+          "${cmd[@]}"
+
+      - name: Render visual suite on Cherenkov CPU
+        id: cpu-pass
+        if: inputs.cpu-features != ''
+        continue-on-error: true
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        env:
+          WATERUI_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/visual-gallery/cpu
+          PACKAGES: ${{ inputs.packages }}
+          CPU_FEATURES: ${{ inputs.cpu-features }}
+          NEXTEST_ARGS: ${{ inputs.nextest-args }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$WATERUI_TEST_ARTIFACTS_DIR"
+          shlex_split() {
+            python3 -c 'import shlex, sys; [sys.stdout.buffer.write(a.encode() + b"\0") for a in shlex.split(sys.argv[1])]' "$1"
+          }
+          cmd=(cargo nextest run --locked)
+          if [ -f .config/nextest.toml ] && grep -q '^\[profile\.ci\]' .config/nextest.toml; then
+            cmd+=(--profile ci)
+          fi
+          if [ -n "$PACKAGES" ]; then
+            mapfile -d '' -t pkg_args < <(shlex_split "$PACKAGES")
+            cmd+=("${pkg_args[@]}")
+          else
+            cmd+=(--workspace)
+          fi
+          mapfile -d '' -t feat_args < <(shlex_split "$CPU_FEATURES")
+          cmd+=("${feat_args[@]}")
+          if [ -n "$NEXTEST_ARGS" ]; then
+            mapfile -d '' -t extra_args < <(shlex_split "$NEXTEST_ARGS")
+            cmd+=("${extra_args[@]}")
+          fi
+          "${cmd[@]}"
+
+      - name: Evaluate FLIP diffs, magma heatmaps, and generate HTML gallery
+        id: evaluate
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        env:
+          BASELINE_DIR: ${{ inputs.baseline-dir }}
+          CPU_ENABLED: ${{ inputs.cpu-features != '' }}
+          REQUIRE_BASELINE: ${{ inputs.require-baseline }}
+          ALLOW_EMPTY: ${{ inputs.allow-empty }}
+          FLIP_MEAN_MAX: ${{ inputs.flip-mean-max }}
+          FLIP_P95_MAX: ${{ inputs.flip-p95-max }}
+        run: |
+          set -euo pipefail
+          args=(
+            --gpu-dir "${RUNNER_TEMP}/visual-gallery/gpu"
+            --output-dir "${RUNNER_TEMP}/visual-gallery"
+            --flip-mean-max "$FLIP_MEAN_MAX"
+            --flip-p95-max "$FLIP_P95_MAX"
+            --repository "${GITHUB_REPOSITORY}"
+            --commit-sha "${GITHUB_SHA}"
+          )
+          if [ "$CPU_ENABLED" = "true" ]; then
+            args+=(--cpu-dir "${RUNNER_TEMP}/visual-gallery/cpu")
+          fi
+          if [ -n "$BASELINE_DIR" ]; then
+            args+=(--baseline-dir "$BASELINE_DIR")
+          fi
+          if [ "$REQUIRE_BASELINE" = "true" ]; then
+            args+=(--require-baseline)
+          fi
+          if [ "$ALLOW_EMPTY" = "true" ]; then
+            args+=(--allow-empty)
+          fi
+          uv run "${RUNNER_TEMP}/water-rs-visual-gallery-tools/visual_gallery.py" "${args[@]}"
+
+      - name: Upload visual gallery artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/visual-gallery/
+          if-no-files-found: ignore
+          retention-days: ${{ inputs.retention-days }}
+
+      - name: Enforce render and FLIP conformance status
+        if: always()
+        shell: bash
+        env:
+          GPU_OUTCOME: ${{ steps.gpu-pass.outcome }}
+          CPU_OUTCOME: ${{ steps.cpu-pass.outcome }}
+          EVAL_OUTCOME: ${{ steps.evaluate.outcome }}
+        run: |
+          set -euo pipefail
+          failed=0
+          if [ "$GPU_OUTCOME" != "success" ]; then
+            echo "::error::Lavapipe GPU render pass failed (outcome: $GPU_OUTCOME)"
+            failed=1
+          fi
+          if [ -n "$CPU_OUTCOME" ] && [ "$CPU_OUTCOME" != "skipped" ] && [ "$CPU_OUTCOME" != "success" ]; then
+            echo "::error::Cherenkov CPU render pass failed (outcome: $CPU_OUTCOME)"
+            failed=1
+          fi
+          if [ "$EVAL_OUTCOME" != "success" ]; then
+            echo "::error::Visual gallery FLIP/completeness evaluation failed (outcome: $EVAL_OUTCOME)"
+            failed=1
+          fi
+          exit "$failed"
