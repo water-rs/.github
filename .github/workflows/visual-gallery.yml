@@ -157,8 +157,11 @@ jobs:
             exit 1
           fi
           echo "WGPU_BACKEND=vulkan" >> "$GITHUB_ENV"
-          # Mesa 26.0.8 Lavapipe AVX-512 16-wide JIT collapses 4x4 diagonal stamps in complex shaders.
-          echo "LP_NATIVE_VECTOR_WIDTH=256" >> "$GITHUB_ENV"
+          # Mesa 26.0.8 on Ubuntu 26.04 (libllvm21) already caps lp_native_vector_width to 256
+          # but still passes +avx512* to LLVM, exposing ymm16-ymm31 on AVX-512 hosts where
+          # LLVM 21 miscompiles RAST_EDGE_TEST 4x4 diagonal stamps. `avx` clears only AVX-512
+          # while preserving AVX2, FMA, F16C, and 256-bit vectors (`u_cpu_detect.c`).
+          echo "GALLIUM_OVERRIDE_CPU_CAPS=avx" >> "$GITHUB_ENV"
 
       - uses: Swatinem/rust-cache@v2
         with:
