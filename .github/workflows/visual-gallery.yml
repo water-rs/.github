@@ -157,6 +157,8 @@ jobs:
             exit 1
           fi
           echo "WGPU_BACKEND=vulkan" >> "$GITHUB_ENV"
+          # Mesa 26.0.8 Lavapipe AVX-512 16-wide JIT collapses 4x4 diagonal stamps in complex shaders.
+          echo "LP_NATIVE_VECTOR_WIDTH=256" >> "$GITHUB_ENV"
 
       - uses: Swatinem/rust-cache@v2
         with:
